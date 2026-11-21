@@ -52,7 +52,7 @@ chroot "$ROOT" /bin/bash -euxc "
   cd /tmp/x86
   apt-get download libc6:amd64 libstdc++6:amd64 libgcc-s1:amd64 zlib1g:amd64 \
     libfreetype6:amd64 libx11-6:amd64 libxext6:amd64
-  for d in *.deb; do dpkg-x \"\$d\" ex; done
+  for d in *.deb; do dpkg-deb -x \"\$d\" ex; done
   cp -a ex/lib/x86_64-linux-gnu/. /usr/lib/box64-x86_64-linux-gnu/ || true
   cp -a ex/usr/lib/x86_64-linux-gnu/. /usr/lib/box64-x86_64-linux-gnu/ || true
   rm -rf /tmp/x86
