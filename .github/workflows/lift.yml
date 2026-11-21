@@ -11,26 +11,41 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Ambil tooling
-        run: |
-          git clone --depth 1 https://github.com/codepdbh/nfsu2-recompiled.git tool
-          git clone https://github.com/sp00nznet/pcrecomp.git pcrecomp
-          git -C pcrecomp checkout 35548b8
-          git -C pcrecomp config user.email ci@example.com
-          git -C pcrecomp config user.name ci
-          git -C pcrecomp am "$GITHUB_WORKSPACE"/tool/patches/pcrecomp/*.patch
-          pip install capstone pefile unicorn keystone-engine
-
-      - name: Normalize dan scan seed
+      - name: Gabung seed
         working-directory: tool
         run: |
-          mkdir -p work
-          python scripts/normalize_exe.py "$GITHUB_WORKSPACE/speed.exe" work/SPEED.analysis.exe
-          python ../pcrecomp/tools/cpp/vtable_scan.py work/SPEED.analysis.exe --seeds work/vtable_seeds.json
-          python ../pcrecomp/tools/cpp/rtti.py work/SPEED.analysis.exe --seeds work/rtti_seeds.json
+          python - <<'EOF'
+          import json
+          a = json.load(open('work/vtable_seeds.json'))
+          b = json.load(open('work/rtti_seeds.json'))
+          seen, out = set(), []
+          for s in a + b:
+              if s['address'] not in seen:
+                  seen.add(s['address'])
+                  out.append(s)
+          json.dump(out, open('work/seeds_all.json', 'w'), indent=1)
+          print(len(out), 'seed')
+          EOF
+
+      - name: Catalog
+        working-directory: tool
+        shell: bash
+        run: python scripts/run_lift.py catalog work/SPEED.analysis.exe work/seeds_all.json work/catalog.json 2>&1 | tee work/catalog.log
+
+      - name: Lift
+        working-directory: tool
+        shell: bash
+        run: |
+          python scripts/run_lift.py lift work/SPEED.analysis.exe work/catalog.json src/recomp/gen 2>&1 | tee work/lift.log
+          echo "File C: $(find src/recomp/gen -name '*.c' | wc -l)" | tee work/ringkasan.txt
+          echo "Baris C: $(find src/recomp/gen -name '*.c' -exec cat {} + | wc -l)" | tee -a work/ringkasan.txt
+          du -sh src/recomp/gen | tee -a work/ringkasan.txt
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lift-work
-          path: tool/work/
+          name: lift-log
+          path: |
+            tool/work/*.log
+            tool/work/ringkasan.txt
+            tool/work/seeds_all.json
