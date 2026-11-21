@@ -1,0 +1,36 @@
+name: Lift test
+on: workflow_dispatch
+
+jobs:
+  lift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Ambil tooling
+        run: |
+          git clone --depth 1 https://github.com/codepdbh/nfsu2-recompiled.git tool
+          git clone https://github.com/sp00nznet/pcrecomp.git pcrecomp
+          git -C pcrecomp checkout 35548b8
+          git -C pcrecomp config user.email ci@example.com
+          git -C pcrecomp config user.name ci
+          git -C pcrecomp am "$GITHUB_WORKSPACE"/tool/patches/pcrecomp/*.patch
+          pip install capstone pefile unicorn keystone-engine
+
+      - name: Normalize dan scan seed
+        working-directory: tool
+        run: |
+          mkdir -p work
+          python scripts/normalize_exe.py "$GITHUB_WORKSPACE/speed.exe" work/SPEED.analysis.exe
+          python ../pcrecomp/tools/cpp/vtable_scan.py work/SPEED.analysis.exe --seeds work/vtable_seeds.json
+          python ../pcrecomp/tools/cpp/rtti.py work/SPEED.analysis.exe --seeds work/rtti_seeds.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lift-work
+          path: tool/work/
