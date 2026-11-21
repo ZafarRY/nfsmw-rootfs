@@ -1,0 +1,34 @@
+name: Build rootfs
+
+on:
+  workflow_dispatch:
+    inputs:
+      box64_ref:
+        description: "Tag/commit Box64"
+        required: true
+      wine_ver:
+        description: "Versi Wine WoW64"
+        required: true
+      dxvk_ver:
+        description: "Versi DXVK"
+        required: true
+
+jobs:
+  rootfs:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install debootstrap
+        run: sudo apt-get update && sudo apt-get install -y debootstrap xz-utils curl
+      - name: Build
+        run: sudo -E bash runtime/rootfs/build-rootfs.sh
+        env:
+          BOX64_REF: ${{ inputs.box64_ref }}
+          WINE_VER: ${{ inputs.wine_ver }}
+          DXVK_VER: ${{ inputs.dxvk_ver }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-arm64
+          path: |
+            out/rootfs-arm64.tar.xz
+            out/rootfs-arm64.tar.xz.sha256
